@@ -304,10 +304,15 @@ def levUp(info, error, otype, oslots, rank):
         if len(mList) == 0:
             embedders.append(tuple())
         else:
-            contentEmbedders = functools.reduce(
-                lambda x, y: x & oslotsInv[y],
-                mList[1:],
-                oslotsInv[mList[0]],
+            # Each embedder must occur in *every* inverse oslots posting.
+            # Iterate the smallest posting and check membership in the
+            # others instead of allocating an intermediate set per slot.
+            # This also handles noncontiguous lexical/hierarchy nodes.
+            postings = tuple(oslotsInv[slot] for slot in mList)
+            candidates = min(postings, key=len)
+            contentEmbedders = (
+                parent for parent in candidates
+                if all(parent in posting for posting in postings)
             )
             embedders.append(
                 tuple(

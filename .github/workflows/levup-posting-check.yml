@@ -1,0 +1,27 @@
+name: Native levUp posting equivalence
+
+on:
+  push:
+    branches: [perf/levup-posting-membership-oracle]
+  pull_request:
+    paths:
+      - "tf/core/prepare.py"
+      - "test/performance/test_levup_posting_membership.py"
+      - ".github/workflows/levup-posting-check.yml"
+
+jobs:
+  native-levup-oracle:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install actual Text-Fabric package and pytest
+        run: python -m pip install -e . pytest
+      - name: Every native embedding must match frozen reference
+        run: python -m pytest -q test/performance/test_levup_posting_membership.py
