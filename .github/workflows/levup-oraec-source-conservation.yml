@@ -1,0 +1,116 @@
+name: Native levUp full ORAEC corpus conservation
+
+on:
+  pull_request:
+    paths:
+      - "tf/core/prepare.py"
+      - "test/performance/oraec_pinned_levup_baseline.json"
+      - ".github/workflows/levup-oraec-source-conservation.yml"
+  push:
+    branches: [perf/levup-posting-membership-oracle]
+
+jobs:
+  pinned-oraec-conservation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install this exact modified Text-Fabric and pinned ORAEC-TF
+        run: |
+          python -m pip install -e .
+          git clone https://github.com/alexsosn/ORAEC-TF.git /tmp/oraec-tf
+          git -C /tmp/oraec-tf checkout 710cda412974b6f795dbbcc902185656ae822496
+          python -m pip install -e /tmp/oraec-tf
+          python - <<'PY'
+          import inspect
+          import tf.core.prepare as prepare
+          assert "candidates = min(postings" in inspect.getsource(prepare.levUp), (
+              "pip picked unmodified Text-Fabric instead of current fork"
+          )
+          PY
+
+      - name: Fetch and verify exact immutable ORAEC raw corpus
+        run: |
+          cd /tmp/oraec-tf
+          oraec-tf fetch upstream/corpus_raw_data
+          oraec-tf verify-source upstream/corpus_raw_data
+
+      - name: Convert and source-only validate with exact modified core
+        run: |
+          cd /tmp/oraec-tf
+          mkdir -p reports/generated
+          oraec-tf convert upstream/corpus_raw_data \
+            --output reports/generated/tf \
+            --upstream-commit b83a0ee5fae27a40d4c0a2a9a8c9c2973d45e9cd \
+            --profile > reports/generated/native-tf-validation.json
+
+      - name: Independently audit every source graph and all 65 TF feature files
+        run: |
+          cd /tmp/oraec-tf
+          python scripts/validate_graph_source.py \
+            upstream/corpus_raw_data reports/generated/tf \
+            --source-revision b83a0ee5fae27a40d4c0a2a9a8c9c2973d45e9cd \
+            --converter-revision 710cda412974b6f795dbbcc902185656ae822496 \
+            --schema-version 3 \
+            --report reports/generated/graph-conservation.json \
+            --profile-report reports/generated/independent-audit-profile.json
+
+      - name: Verify output against separately validated upstream-native baseline
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          baseline = json.loads(
+              (Path(os.environ["GITHUB_WORKSPACE"]) /
+               "test/performance/oraec_pinned_levup_baseline.json").read_text()
+          )
+          report = json.loads(
+              Path("/tmp/oraec-tf/reports/generated/graph-conservation.json").read_text()
+          )
+          assert report["ok"] is True
+          assert report["source_revision"] == baseline["source_revision"]
+          assert report["tf_version"] == baseline["tf_version"]
+          assert report["counts"] == baseline["counts"]
+          assert report["native_cr_occurrences"] == baseline["native_cr_occurrences"]
+          assert report["total_tf_bytes"] == baseline["total_tf_bytes"]
+          digests = report["output_semantic_sha256"]
+          assert len(digests) == baseline["output_semantic_sha256_count"]
+          all_digests = hashlib.sha256(
+              json.dumps(digests, sort_keys=True, ensure_ascii=False,
+                         separators=(",", ":")).encode("utf-8")
+          ).hexdigest()
+          assert all_digests == baseline["all_semantic_digest_sha256"], (
+              "modified core changed at least one TF feature's canonical SHA-256"
+          )
+          print("Full original-source and semantic graph conservation: PASSED")
+          print("Source texts:", report["counts"]["texts"])
+          print("Native CR nodes:", report["native_cr_occurrences"]["total"])
+          print("65 unchanged canonical feature digests:", all_digests)
+          PY
+
+      - name: Smoke original full native Text-Fabric advanced app
+        run: |
+          cd /tmp/oraec-tf
+          python scripts/validate_advanced_app.py reports/generated/tf \
+            > reports/generated/advanced-app-validation.json
+
+      - name: Upload provenance and timings only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: levup-fork-oraec-source-conservation
+          path: |
+            /tmp/oraec-tf/reports/generated/native-tf-validation.json
+            /tmp/oraec-tf/reports/generated/graph-conservation.json
+            /tmp/oraec-tf/reports/generated/independent-audit-profile.json
+            /tmp/oraec-tf/reports/generated/advanced-app-validation.json
+          if-no-files-found: warn
