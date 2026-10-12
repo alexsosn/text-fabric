@@ -1,0 +1,33 @@
+{
+  "description": "Source-independent canonical Text-Fabric v13.1.0 ORAEC-TF corpus provenance: reference SHA-256 over sorted compact JSON of all 65 timestamp-neutral TF feature digests. Generated on immutable source with standalone independent raw-source graph checks; no corpus payload included.",
+  "source_revision": "b83a0ee5fae27a40d4c0a2a9a8c9c2973d45e9cd",
+  "oraec_tf_revision": "710cda412974b6f795dbbcc902185656ae822496",
+  "tf_version": "13.1.0",
+  "output_semantic_sha256_count": 65,
+  "all_semantic_digest_sha256": "abd68a103f13407f48824cebb7516cb7187f98916f9d74f60d90b2d8cf622e5b",
+  "total_tf_bytes": 105254838,
+  "counts": {
+    "anchors": 3,
+    "sentences": 101796,
+    "texts": 13026,
+    "tokens": 815026
+  },
+  "native_cr_occurrences": {
+    "total": 2930,
+    "by_feature": {
+      "bibliography": 1982,
+      "cotext_translation": 10,
+      "translation": 938
+    },
+    "by_owner_type": {
+      "sentence": 938,
+      "text": 1982,
+      "word": 10
+    }
+  },
+  "baseline_action_artifacts": [
+    11718633747,
+    11718553445,
+    11742333778
+  ]
+}
