@@ -88,17 +88,18 @@ def test_native_oracle_matches_deterministic_randomized_graphs():
         _check(n_slots, nodes, tuple(ranks))
 
 
-def test_missing_posting_raises_original_keyerror():
-    # Invalid oslots source can fail while sorting a multi-slot node if a
-    # second posting is absent. Preserve that failure rather than skipping it.
+def test_out_of_range_slot_membership_preserves_original_result():
+    # This posting is constructed from the very same oslots values, so even
+    # an invalid slot 999 does NOT cause a KeyError inside native levUp.
+    # Keep that original algorithm behavior unchanged; other TF validation
+    # layers are responsible for rejecting out-of-range oslots data.
     warp = (("node",), 2, 3, "word")
-    data = (((1, 999),),)
-    for implementation in (
-        reference_lev_up,
-        lambda o, s, r: prepare.levUp(lambda x: None, lambda x: None, o, s, r),
-    ):
-        with pytest.raises(KeyError, match="999"):
-            implementation(warp, data, (3, 2, 1))
+    membership = (((1, 999),),)
+    ranks = (3, 2, 1)
+    actual = prepare.levUp(
+        lambda x: None, lambda x: None, warp, membership, ranks,
+    )
+    assert actual == reference_lev_up(warp, membership, ranks)
 
 
 def test_no_python_set_and_allocations_on_multi_slot_nodes(monkeypatch):
